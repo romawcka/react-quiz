@@ -8,51 +8,46 @@ import Progress from './components/Progress';
 import Question from './components/Question';
 import Footer from './components/Footer';
 import Timer from './components/Timer';
-import Button from './components/Button';
-import FinishScreen from './components/FinishScreen';
 
-const apiUrl = import.meta.env.REACT_APP_URL;
-const SECS_PER_QUESTION = 30;
+import FinishScreen from './components/FinishScreen';
+import Button from './components/Button';
+
+const SECS_PER_QUESTION = import.meta.env.VITE_SECS_PER_QUESTION;
+const URL = import.meta.env.VITE_QUESTIONS_URI;
 
 const initialState = {
   questions: [],
+  // 'loading', 'error', 'ready', 'active', 'finished'
+  status: 'loading',
   index: 0,
-  points: 0,
   answer: null,
+  points: 0,
   highscore: 0,
   secondsRemaining: null,
-  status: 'Loading', // error, ready, start, finish
 };
 
-const reducer = (state, action) => {
+function reducer(state, action) {
   switch (action.type) {
     case 'dataReceived':
       return {
         ...state,
         questions: action.payload,
-        status: 'Ready',
+        status: 'ready',
       };
-    case 'quizStart':
+    case 'dataFailed':
       return {
         ...state,
-        status: 'Start',
+        status: 'error',
+      };
+    case 'start':
+      return {
+        ...state,
+        status: 'active',
         secondsRemaining: state.questions.length * SECS_PER_QUESTION,
-      };
-    case 'quizFinish':
-      return {
-        ...state,
-        status: 'Finish',
-        highscore:
-          state.points > state.highscore ? state.points : state.highscore,
-      };
-    case 'quizRestart':
-      return {
-        ...state,
-        status: 'Ready',
-        questions: state.questions,
       };
     case 'newAnswer':
       const question = state.questions.at(state.index);
+
       return {
         ...state,
         answer: action.payload,
@@ -62,74 +57,77 @@ const reducer = (state, action) => {
             : state.points,
       };
     case 'nextQuestion':
+      return { ...state, index: state.index + 1, answer: null };
+    case 'finish':
       return {
         ...state,
-        index: state.index + 1,
-        answer: null,
+        status: 'finished',
+        highscore:
+          state.points > state.highscore ? state.points : state.highscore,
       };
-    case 'dataRejected':
-      return {
-        ...state,
-        status: 'Error',
-      };
+    case 'restart':
+      return { ...initialState, questions: state.questions, status: 'ready' };
+
     case 'tick':
       return {
         ...state,
         secondsRemaining: state.secondsRemaining - 1,
-        status: state.secondsRemaining === 0 ? 'Finish' : state.status,
+        status: state.secondsRemaining === 0 ? 'finished' : state.status,
       };
+
     default:
-      state;
+      throw new Error('Action unkonwn');
   }
-};
+}
 
-const App = () => {
-  const [state, dispatch] = useReducer(reducer, initialState);
-  const {
-    questions,
-    status,
-    index,
-    answer,
-    points,
-    highscore,
-    secondsRemaining,
-  } = state;
-
-  useEffect(() => {
-    fetch(apiUrl ?? 'http://localhost:9000/questions')
-      .then((res) => res.json())
-      .then((data) => dispatch({ type: 'dataReceived', payload: data }))
-      .catch(() => dispatch({ type: 'dataRejected' }));
-  }, []);
+export default function App() {
+  const [
+    { questions, status, index, answer, points, highscore, secondsRemaining },
+    dispatch,
+  ] = useReducer(reducer, initialState);
 
   const numQuestions = questions.length;
-
-  const maxAvailablePoints = questions.reduce(
-    (prv, curr) => prv + curr.points,
+  const maxPossiblePoints = questions.reduce(
+    (prev, cur) => prev + cur.points,
     0
   );
+
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      try {
+        const res = await fetch(URL);
+        if (!res.ok) throw new Error('Something went wrong');
+        const data = await res.json();
+        dispatch({ type: 'dataReceived', payload: data });
+      } catch (error) {
+        console.log(error);
+        dispatch({ type: 'dataFailed' });
+      }
+    };
+    fetchQuestions();
+  }, []);
 
   return (
     <div className='app'>
       <Header />
       <Main>
-        {status === 'Loading' && <Loader />}
-        {status === 'Error' && <Error />}
-        {status === 'Ready' && (
-          <StartScreen dispatch={dispatch} numQuestions={numQuestions} />
+        {status === 'loading' && <Loader />}
+        {status === 'error' && <Error />}
+        {status === 'ready' && (
+          <StartScreen numQuestions={numQuestions} dispatch={dispatch} />
         )}
-        {status === 'Start' && (
+        {status === 'active' && (
           <>
             <Progress
               index={index}
-              answer={answer}
-              points={points}
               numQuestions={numQuestions}
-              maxAvailablePoints={maxAvailablePoints}
+              points={points}
+              maxPossiblePoints={maxPossiblePoints}
+              answer={answer}
             />
             <Question
-              dispatch={dispatch}
               question={questions[index]}
+              dispatch={dispatch}
               answer={answer}
             />
             <Footer>
@@ -137,23 +135,21 @@ const App = () => {
               <Button
                 dispatch={dispatch}
                 answer={answer}
-                index={index}
                 numQuestions={numQuestions}
+                index={index}
               />
             </Footer>
           </>
         )}
-        {status === 'Finish' && (
+        {status === 'finished' && (
           <FinishScreen
             points={points}
-            dispatch={dispatch}
+            maxPossiblePoints={maxPossiblePoints}
             highscore={highscore}
-            maxAvailablePoints={maxAvailablePoints}
+            dispatch={dispatch}
           />
         )}
       </Main>
     </div>
   );
-};
-
-export default App;
+}

@@ -1,29 +1,28 @@
-const FinishScreen = ({ points, dispatch, highscore, maxAvailablePoints }) => {
-  const percentage = (points / maxAvailablePoints) * 100;
+function FinishScreen({ points, maxPossiblePoints, highscore, dispatch }) {
+  const percentage = (points / maxPossiblePoints) * 100;
 
   let emoji;
-  if (percentage >= 95) emoji = '🥇';
-  if (percentage >= 85 && percentage < 95) emoji = '🥈';
-  if (85 <= percentage < 95) emoji = '🥈';
-  if (percentage >= 75 && percentage < 85) emoji = '🥉';
-  if (percentage >= 55 && percentage < 75) emoji = '😐';
-  if (percentage < 45) emoji = '🤦‍♂️';
+  if (percentage === 100) emoji = '🥇';
+  if (percentage >= 80 && percentage < 100) emoji = '🎉';
+  if (percentage >= 50 && percentage < 80) emoji = '🙃';
+  if (percentage >= 0 && percentage < 50) emoji = '🤨';
+  if (percentage === 0) emoji = '🤦‍♂️';
 
   return (
     <>
       <p className='result'>
-        <span>{emoji}</span> Your score <strong>{points}</strong> out of{' '}
-        {maxAvailablePoints} ({Math.ceil(percentage)}%)
+        <span>{emoji}</span> You scored <strong>{points}</strong> out of{' '}
+        {maxPossiblePoints} ({Math.ceil(percentage)}%)
       </p>
       <p className='highscore'>(Highscore: {highscore} points)</p>
       <button
         className='btn btn-ui'
-        onClick={() => dispatch({ type: 'quizRestart' })}
+        onClick={() => dispatch({ type: 'restart' })}
       >
-        Restart Quiz
+        Restart quiz
       </button>
     </>
   );
-};
+}
 
 export default FinishScreen;
